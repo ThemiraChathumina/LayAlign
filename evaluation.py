@@ -98,11 +98,11 @@ def evaluate_ppl(model, test_set, tokenizer_llm, tokenizer_mt, max_seq_len, max_
 
 def accelerate_evaluate_ppl(accelerator, model, test_set, tokenizer_llm, tokenizer_mt, max_seq_len, max_gen_len, langs_map, use_prompt):
     model.eval()
-    step_trange = tqdm(test_set, disable=not accelerator.is_local_main_process)
+    # step_trange = tqdm(test_set, disable=not accelerator.is_local_main_process)
     loss_all = 0
     step_i = 0
 
-    for test_step in step_trange:
+    for test_step in test_set:
         step_i += 1
         sources = test_step['source']
         prompts = test_step['prompt']
@@ -131,7 +131,7 @@ def accelerate_evaluate_ppl(accelerator, model, test_set, tokenizer_llm, tokeniz
             loss_all += accelerator.gather(loss).sum().item()
         
         loss_show = 'loss:' + str(round(loss_all / (step_i * accelerator.num_processes), 4))
-        step_trange.set_postfix_str(loss_show)
+        # step_trange.set_postfix_str(loss_show)
 
     loss = loss_all / (step_i * accelerator.num_processes)
     perplexity = math.exp(loss)

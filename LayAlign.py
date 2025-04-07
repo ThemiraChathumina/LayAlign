@@ -1,4 +1,3 @@
-
 from transformers import AutoModelForCausalLM, AutoModel, AutoConfig
 import torch
 from torch import nn
@@ -6,7 +5,7 @@ from transformers import LlamaConfig
 from layer_wise_aligner import EncoderAligner
 from peft import get_peft_model, AdaptionPromptConfig
 class LayAlignConfig(LlamaConfig):
-    def __init__(self, mt_path, llm_path, max_gen_len, llm_bos_token_id, llm_pad_token_id, encoder_aligner_config, augmentation, **kwargs):
+    def __init__(self, mt_path, llm_path, max_gen_len, llm_bos_token_id, llm_pad_token_id, encoder_aligner_config, augmentation, quantization_config, lora_config, num_embedding_tokens, **kwargs):
         super().__init__(**kwargs)
         self.mt_path = mt_path
         self.llm_path = llm_path
@@ -15,6 +14,78 @@ class LayAlignConfig(LlamaConfig):
         self.llm_pad_token_id = llm_pad_token_id
         self.encoder_aligner_config = encoder_aligner_config
         self.augmentation = augmentation
+        self.quantization_config = quantization_config
+        self.lora_config = lora_config
+        self.num_embedding_tokens = num_embedding_tokens
+
+class MultilingualEmbeddingModel(nn.Module):
+    ALLOWED_MODELS = {
+        "FacebookAI/xlm-roberta-base",
+        "FacebookAI/xlm-roberta-large",
+        "facebook/nllb-200-distilled-600M",
+        "facebook/nllb-200-1.3B",
+        "google/mt5-small",
+        "google/mt5-base",
+        "google/mt5-large",
+        "DKYoon/mt5-small-lm-adapt",
+        "DKYoon/mt5-large-lm-adapt",
+        "DKYoon/mt5-xl-lm-adapt"
+    }
+    
+    def __init__(self, embedding_model_name: str, num_embedding_tokens: int = -1, 
+                 freeze_embedding: bool = True):
+        super().__init__()
+
+        if embedding_model_name not in self.ALLOWED_MODELS:
+            raise ValueError(f"Model {embedding_model_name} is not in allowed models: {self.ALLOWED_MODELS}")
+        
+        # Load the encoder model
+        self.embedding_model = AutoModel.from_pretrained(embedding_model_name)
+        if "nllb" in embedding_model_name or "mt5" in embedding_model_name:
+            self.embedding_model = self.embedding_model.encoder  # Use only encoder for these models
+        self.num_embedding_tokens = num_embedding_tokens
+        self.embedding_dim = self.embedding_model.config.hidden_size
+        
+        self.freeze_embedding = freeze_embedding
+        # When using learnable queries, freeze the encoder so that only queries are updated.
+        if freeze_embedding:
+            for param in self.embedding_model.parameters():
+                param.requires_grad = False
+
+        # If using prepended queries, initialize them.
+        if num_embedding_tokens > -1:
+            self.learnable_queries = nn.Parameter(torch.randn(num_embedding_tokens, self.embedding_dim))
+    
+    def forward(self, input_ids, attention_mask):
+        batch_size = input_ids.shape[0]
+
+        if self.num_embedding_tokens > -1:
+            # Obtain the original token embeddings via the model's embedding layer.
+            inputs_embeds = self.embedding_model.get_input_embeddings()(input_ids)  # [B, L, D]
+            
+            # Expand learnable query embeddings to match the batch size.
+            queries = self.learnable_queries.unsqueeze(0).expand(batch_size, -1, -1)  # [B, Q, D]
+            
+            # Prepend the learnable queries to the token embeddings.
+            combined_inputs = torch.cat([queries, inputs_embeds], dim=1)  # [B, Q+L, D]
+            
+            # Adjust the attention mask: prepend ones for the query tokens.
+            query_mask = torch.ones(batch_size, self.num_embedding_tokens, dtype=attention_mask.dtype, device=attention_mask.device)
+            combined_attention_mask = torch.cat([query_mask, attention_mask], dim=1)  # [B, Q+L]
+            
+            # Pass the combined embeddings through the (frozen) encoder.
+            outputs = self.embedding_model(inputs_embeds=combined_inputs, attention_mask=combined_attention_mask, output_hidden_states=True)
+            
+            # Split the outputs into query and token parts.
+            # query_outputs = outputs.last_hidden_state[:, :queries.shape[1], :]  # [B, Q, D]
+            # token_outputs = outputs.last_hidden_state[:, queries.shape[1]:, :]  # [B, L, D]
+            
+            # Return both outputs (or process as needed).
+            return outputs, combined_attention_mask
+        else:
+            outputs = self.embedding_model(input_ids=input_ids, attention_mask=attention_mask, output_hidden_states=True)
+            return outputs, attention_mask
+        
 
 
 class MLP(nn.Module):
@@ -48,40 +119,32 @@ class LayAlign(nn.Module):
         super(LayAlign, self).__init__()
         self.config = config  # Ensure there is a config attribute
         self.max_gen_len = config.max_gen_len
-        model_mt = AutoModel.from_pretrained(config.mt_path)
-        print('MT model size:', sum(param.numel() for param in model_mt.parameters()) / 1000000)
-        #self.model_mt = model_mt
-        if encoder_freeze:
-            for name, parameter in model_mt.named_parameters():
-                parameter.requires_grad = False
-        if 'bert' in config.mt_path or 'GPT' in config.mt_path or 'Qwen' in config.mt_path or 'xglm' in config.mt_path:
-            self.encoder_mt = model_mt
-        else:
-            self.encoder_mt = model_mt.get_encoder()
-        print('used size:', sum(param.numel() for param in self.encoder_mt.parameters()) / 1000000)
 
-        model_llm = AutoModelForCausalLM.from_pretrained(config.llm_path)
+        self.encoder_mt = MultilingualEmbeddingModel(config.mt_path, num_embedding_tokens=config.num_embedding_tokens)
+
+        model_llm = AutoModelForCausalLM.from_pretrained(config.llm_path, quantization_config=config.quantization_config)
+
+        for name, parameter in model_llm.named_parameters():
+                parameter.requires_grad = False
+        
+        if config.lora_config:
+            model_llm = get_peft_model(model_llm, config.lora_config).base_model.model
 
         peft_config = AdaptionPromptConfig(
             adapter_layers = self.config.encoder_aligner_config.language_layers
         )
-        #
+        
         model_llm = get_peft_model(model_llm, peft_config).base_model
+
+        for name, param in model_llm.named_parameters():
+            if "lora" in name:
+                param.requires_grad = True  
+        
         self.model_llm = model_llm
-        if config.augmentation and not freeze:
-            for name, parameter in self.model_llm.named_parameters():
-                parameter.requires_grad = True
         
         self.llm_embedding_layer = self.model_llm.get_input_embeddings()
-        # for name, parameter in self.model_llm.named_parameters():
-        #     parameter.requires_grad = False
-        if 'bert' in config.mt_path or 'Qwen' in config.mt_path:
-            d_model = model_mt.config.hidden_size
-        elif 'GPT' in config.mt_path:
-            d_model = model_mt.config.n_embd
-        else:
-            d_model = model_mt.config.d_model
-        self.mapping = Mapping(d_model, model_llm.config.hidden_size)
+     
+        self.mapping = Mapping(self.encoder_mt.embedding_dim, model_llm.config.hidden_size)
         self.encoder_aligner = EncoderAligner(config.encoder_aligner_config)
         self.llm_pad_token_id = config.llm_pad_token_id
         self.llm_bos_token_id = config.llm_bos_token_id
@@ -125,9 +188,8 @@ class LayAlign(nn.Module):
         llm_input_embedding = bos_embedding
         llm_input_mask = mask
 
-        mt_encoder_outputs = self.encoder_mt(input_ids=input_ids_mt,
-                                             attention_mask=attention_mask_mt,
-                                             output_hidden_states=True)
+        mt_encoder_outputs, attention_mask_mt = self.encoder_mt(input_ids=input_ids_mt,
+                                                                attention_mask=attention_mask_mt)
         
         mt_encoder_hidden = []
         for i in self.config.encoder_aligner_config.encoder_layers:
