@@ -5,7 +5,7 @@ from transformers import LlamaConfig
 from layer_wise_aligner import EncoderAligner
 from peft import get_peft_model, AdaptionPromptConfig
 class LayAlignConfig(LlamaConfig):
-    def __init__(self, mt_path, llm_path, max_gen_len, llm_bos_token_id, llm_pad_token_id, encoder_aligner_config, augmentation, quantization_config, lora_config, num_embedding_tokens, **kwargs):
+    def __init__(self, mt_path, llm_path, max_gen_len, llm_bos_token_id, llm_pad_token_id, encoder_aligner_config, augmentation, quantization_config, lora_config, num_embedding_tokens, isLayAlign, **kwargs):
         super().__init__(**kwargs)
         self.mt_path = mt_path
         self.llm_path = llm_path
@@ -17,6 +17,7 @@ class LayAlignConfig(LlamaConfig):
         self.quantization_config = quantization_config
         self.lora_config = lora_config
         self.num_embedding_tokens = num_embedding_tokens
+        self.isLayAlign = isLayAlign
 
 class MultilingualEmbeddingModel(nn.Module):
     ALLOWED_MODELS = {
@@ -130,11 +131,13 @@ class LayAlign(nn.Module):
         if config.lora_config:
             model_llm = get_peft_model(model_llm, config.lora_config).base_model.model
 
-        peft_config = AdaptionPromptConfig(
-            adapter_layers = self.config.encoder_aligner_config.language_layers
-        )
-        
-        model_llm = get_peft_model(model_llm, peft_config).base_model
+        if config.isLayAlign:
+            peft_config = AdaptionPromptConfig(
+                adapter_layers = self.config.encoder_aligner_config.language_layers
+            )
+            
+            model_llm = get_peft_model(model_llm, peft_config).base_model
+            self.encoder_aligner = EncoderAligner(config.encoder_aligner_config)
 
         for name, param in model_llm.named_parameters():
             if "lora" in name:
@@ -145,7 +148,6 @@ class LayAlign(nn.Module):
         self.llm_embedding_layer = self.model_llm.get_input_embeddings()
      
         self.mapping = Mapping(self.encoder_mt.embedding_dim, model_llm.config.hidden_size)
-        self.encoder_aligner = EncoderAligner(config.encoder_aligner_config)
         self.llm_pad_token_id = config.llm_pad_token_id
         self.llm_bos_token_id = config.llm_bos_token_id
         print('mapping layer size:', sum(param.numel() for param in self.mapping.parameters()) / 1000000)
@@ -195,10 +197,11 @@ class LayAlign(nn.Module):
         for i in self.config.encoder_aligner_config.encoder_layers:
             mt_encoder_hidden.append(mt_encoder_outputs.hidden_states[i])
 
-        adapter_states = self.encoder_aligner(mt_encoder_hidden)
-        for i, index_layer in enumerate(self.model_llm.peft_config["default"].adapter_layers):
-            adapter_state = adapter_states[i]
-            self.model_llm.base_model.layers[index_layer].self_attn.update_adapter_states(adapter_state)
+        if self.config.isLayAlign:
+            adapter_states = self.encoder_aligner(mt_encoder_hidden)
+            for i, index_layer in enumerate(self.model_llm.peft_config["default"].adapter_layers):
+                adapter_state = adapter_states[i]
+                self.model_llm.base_model.layers[index_layer].self_attn.update_adapter_states(adapter_state)
 
         encoder_last_hidden_state = mt_encoder_outputs[0]
         mt_hidden_state = self.mapping(encoder_last_hidden_state)
