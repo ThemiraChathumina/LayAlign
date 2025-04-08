@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# chmod +x setup.sh
 # Exit immediately if any command fails
 set -e
 

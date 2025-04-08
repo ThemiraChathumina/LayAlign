@@ -101,7 +101,7 @@ class MPTrainer(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         encoder_input, expected_output = batch
         
-        encoder_input = [f"{self.system_prompt}\n{self.user_prompt_function(i)}" for i in encoder_input]
+        # encoder_input = [f"{self.system_prompt}\n{self.user_prompt_function(i)}" for i in encoder_input]
         
         encoded_inputs = self.tokenizer_m2m(
             encoder_input, padding=True, truncation=True, return_tensors="pt"
@@ -201,7 +201,7 @@ class MPTrainer(pl.LightningModule):
             for i in tqdm(range(0, len(encoder_inputs), batch_size)):
                 batch_q = encoder_inputs[i:i + batch_size]
     
-                batch_q = [f"{self.system_prompt}\n{self.user_prompt_function(i)}" for i in batch_q]
+                # batch_q = [f"{self.system_prompt}\n{self.user_prompt_function(i)}" for i in batch_q]
 
                     
                 encoded_inputs = self.tokenizer_m2m(
@@ -265,9 +265,12 @@ class ExperimentDataset(Dataset):
 token = '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'
 login(token=token)
 
-ds = load_dataset("Themira/en_si_news_classification_with_label_name")
+ds = load_dataset("facebook/xnli", "en")
 
-train_ds = ds['train_en']
+train_ds = ds['train']
+
+sentences = [f"Premise: {prem} Hypothesis: {hyp} Label:" for prem,hyp in zip(train_ds['premise'], train_ds['hypothesis'])]
+labels = train_ds['label']
 
 # Access the train and test splits
 # train_ds = ds.filter(lambda example: example['lang'] in ['en', 'sw'])
@@ -275,28 +278,28 @@ train_ds = ds['train_en']
 print("Train split:", train_ds)
 
 train_dataset = ExperimentDataset(
-    train_ds['sentence'],
-    train_ds['label']
+    sentences,
+    labels
 )
 
 batch_size = 4
 train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=8)
 
-llm_model_name = "meta-llama/Llama-3.2-1B-Instruct"
+llm_model_name = "LLaMAX/LLaMAX2-7B-XNLI"
 encoder_model_name = "google/mt5-large"
 
-# quantization_config = BitsAndBytesConfig(
-#     load_in_4bit=True,
-#     bnb_4bit_compute_dtype=torch.float16,
-#     bnb_4bit_quant_type="nf4"
-# )
+quantization_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_compute_dtype=torch.float16,
+    bnb_4bit_quant_type="nf4"
+)
 
-quantization_config = None
+# quantization_config = None
 
 encoder_layers = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,]
-language_layers = [i for i in range(16)]
+language_layers = [i for i in range(32)]
 encoder_hidden_dim = 1024
-language_hidden_dim = 2048
+language_hidden_dim = 4096
 num_embedding_tokens = -1
 lr = 2e-5
 epochs = 3
@@ -317,7 +320,7 @@ lora_config = None
 isLayAlign = True
 
 def user_prompt_function(enc_input):
-    return f"### Instruction:\nClassify the given news sentence into one of the following categories.\nBusiness, Entertainment, Political, Sports, Science.\nNews sentence: {{{enc_input}}}\n\n### Response:"
+    return f""
 
 train_args = {
     'llm_model_name': llm_model_name,
@@ -383,20 +386,20 @@ print(final_train_loss)
 
 model.save_weights('/root/LayAlign/model.pth')
 
-model.eval()
+# model.eval()
 
-model.to('cuda')
+# model.to('cuda')
 
-si_pred = model.evaluate_dataset(ds['test_si']['sentence'], batch_size=batch_size//2)
-accuracy_si = accuracy_score(ds['test_si']['label'], si_pred)
-f1_si = f1_score(ds['test_si']['label'], si_pred, average='weighted')  # Use 'binary', 'macro', or 'weighted' as needed
+# si_pred = model.evaluate_dataset(ds['test_si']['sentence'], batch_size=batch_size//2)
+# accuracy_si = accuracy_score(ds['test_si']['label'], si_pred)
+# f1_si = f1_score(ds['test_si']['label'], si_pred, average='weighted')  # Use 'binary', 'macro', or 'weighted' as needed
 
-print(f"Accuracy Si: {accuracy_si}")
-print(f"F1 Score Si: {f1_si}")
+# print(f"Accuracy Si: {accuracy_si}")
+# print(f"F1 Score Si: {f1_si}")
 
-en_pred = model.evaluate_dataset(ds['test_en']['sentence'], batch_size=batch_size//2)
-accuracy_en = accuracy_score(ds['test_en']['label'], en_pred)
-f1_en = f1_score(ds['test_en']['label'], en_pred, average='weighted')  # Use 'binary', 'macro', or 'weighted' as needed
+# en_pred = model.evaluate_dataset(ds['test_en']['sentence'], batch_size=batch_size//2)
+# accuracy_en = accuracy_score(ds['test_en']['label'], en_pred)
+# f1_en = f1_score(ds['test_en']['label'], en_pred, average='weighted')  # Use 'binary', 'macro', or 'weighted' as needed
 
-print(f"Accuracy En: {accuracy_en}")
-print(f"F1 Score En: {f1_en}")
+# print(f"Accuracy En: {accuracy_en}")
+# print(f"F1 Score En: {f1_en}")
