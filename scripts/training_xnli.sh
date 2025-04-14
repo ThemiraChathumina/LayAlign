@@ -50,7 +50,7 @@ accelerate launch \
     --train_batch_size $TOTAL_BATCH_SIZE \
     --train_micro_batch_size_per_gpu $BATCH_SIZE_PER_GPU \
     --gradient_accumulation $GRADIENT_ACC_STEPS \
-    --augmentation True \
+    --augmentation False \
     --epoch_num 3 \
     --max_seq_len 200 \
     --max_gen_len 200 \

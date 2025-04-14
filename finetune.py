@@ -29,8 +29,6 @@ from accelerate.utils import set_seed
 
 logger = get_logger(__name__)
 
-import os
-
 directory = "./datas/query_translation/"
 os.makedirs(directory, exist_ok=True)
 
