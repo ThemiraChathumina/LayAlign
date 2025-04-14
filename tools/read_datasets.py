@@ -132,6 +132,7 @@ def read_x_csqa_train():
 
 
 def read_xnli_train():
+    ds = load_dataset("Themira/xnli_layalign", cache_dir = './datas/query_translation')
     dataset = read_dataset(f'./datas/query_translation/xnli_dev.json')
     train_set = []
     for sample in dataset:
