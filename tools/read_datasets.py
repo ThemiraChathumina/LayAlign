@@ -132,11 +132,19 @@ def read_x_csqa_train():
 
 
 def read_xnli_train():
-    dataset = read_dataset(f'/root/LayAlign/xnli_layalign/xnli_dev.json')
+    ds = load_dataset("facebook/xnli", "en")
+    train_ds = ds['train']
     train_set = []
-    for sample in dataset:
-        sample['target'] = sample['label']
-        sample['source_language'] = sample['language']
+    labels = {0:'entailment', 1:'neutral', 2:'contradiction'}
+    for i in range(30000):
+        sample = {}
+        sample['id'] = i
+        sample['language'] = 'English'
+        sample['sentence1'] = train_ds[i]['premise']
+        sample['sentence2'] = train_ds[i]['hypothesis']
+        sample['label'] = f"{labels[int(train_ds[i]['label'])]}"
+        sample['target'] = f"{labels[int(train_ds[i]['label'])]}"
+        sample['source_language'] = 'English'
         sample['target_language'] = 'English'
         train_set.append(sample)
     random.shuffle(train_set)
@@ -301,7 +309,7 @@ def read_x_csqa():
 
 
 def read_xnli():
-    dataset = read_dataset(f'./datas/evaluation/xnli/test.json')
+    dataset = read_dataset(f'/root/LayAlign/xnli_layalign/test.json')
     test_sets = {}
     for sample in dataset:
         sample['target'] = sample['label']

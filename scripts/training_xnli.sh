@@ -42,7 +42,7 @@ accelerate launch \
     --use_deepspeed \
     --deepspeed_config_file ds_configs/zero2_dp.json \
     finetune.py \
-    --llm_path LLaMAX/LLaMAX2-7B \
+    --llm_path LLaMAX/LLaMAX2-7B-XNLI \
     --mt_path google/mt5-xl \
     --stage_name augmentation \
     --task xnli \
@@ -56,7 +56,7 @@ accelerate launch \
     --max_gen_len 200 \
     --eval_batch_size $BATCH_SIZE_PER_GPU \
     --dev_size 3000 \
-    --logging_steps 10 \
+    --logging_steps 5000 \
     --lr 3e-5 \
     --save_name LayAlign-xnli-test1 \
     --warm_rate 0.05 \

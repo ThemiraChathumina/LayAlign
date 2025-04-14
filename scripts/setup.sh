@@ -15,9 +15,13 @@ pip install -r requirements.txt
 # Change directory to 'peft'
 cd peft
 
+pip install -e ".[train]"
+
+cd ..
+
 # Update and install git-lfs
-sudo apt update
-sudo apt install -y git-lfs
+apt update
+apt install -y git-lfs
 
 # Initialize git-lfs and clone the dataset
 git lfs install

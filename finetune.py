@@ -334,8 +334,8 @@ def main():
         'output_model_path': output_model_path_base,
     }, indent=2))
 
-    if stage_name != 'translation' and args.init_checkpoint is None:
-        args.init_checkpoint = f'./outputs/{save_name}/translation/pytorch_model.bin'
+    # if stage_name != 'translation' and args.init_checkpoint is None:
+    #     args.init_checkpoint = f'./outputs/{save_name}/translation/pytorch_model.bin'
     
 
 

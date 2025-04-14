@@ -1,5 +1,5 @@
 #!/bin/bash
-CUDA_VISIBLE_DEVICES=3
+CUDA_VISIBLE_DEVICES=0,1
 
 random_port(){
     # Random port
@@ -49,6 +49,6 @@ python -u -m deepspeed.launcher.launch --world_info=$WID \
     --llm_path LLaMAX/LLaMAX2-7B-XNLI --mt_path google/mt5-xl \
     --eval_batch_size 8 \
     --structure Linear \
-    --init_checkpoint ./outputs/LayAlign_XNLI/epoch_2_augmentation/pytorch_model.bin \
-    --augmentation True \
+    --init_checkpoint /root/LayAlign/outputs/LayAlign-xnli-test1/epoch_2_augmentation/pytorch_model.bin \
+    --augmentation False \
 

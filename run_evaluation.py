@@ -13,18 +13,18 @@ import deepspeed
 from tools.deepspeed_config import get_train_ds_config
 from LayAlign import LayAlign,LayAlignConfig
 from types import SimpleNamespace
-def main(args):
-    llm_path = args.llm_path
-    mt_path = args.mt_path
+def main():
+    llm_path = "LLaMAX/LLaMAX2-7B-XNLI"
+    mt_path = "google/mt5-xl"
 
-    max_seq_len = args.max_seq_len
-    max_gen_len = args.max_gen_len
+    max_seq_len = 512
+    max_gen_len = 512
 
-    eval_batch_size = args.eval_batch_size
+    eval_batch_size = 4
 
-    augmentation = args.augmentation
-    save_name = args.save_name
-    task = args.task
+    augmentation = False
+    save_name = "MindMerger"
+    task = "xnli"
 
     result_path_base = f'./results/{save_name}/{task}/'
 
@@ -53,12 +53,12 @@ def main(args):
         'save_name': save_name,
         'result_path_base': result_path_base
     }, indent=2))
-
-    train_micro_batch_size_per_gpu = args.train_micro_batch_size_per_gpu
-    train_batch_size = args.train_batch_size
+    print("cuda available: " , torch.cuda.is_available())
+    train_micro_batch_size_per_gpu = 4
+    train_batch_size = 4
     gpu_num = torch.cuda.device_count()
-    gradient_accumulation = train_batch_size // (train_micro_batch_size_per_gpu * gpu_num)
-    assert train_micro_batch_size_per_gpu * gpu_num * gradient_accumulation == train_batch_size
+    gradient_accumulation = 1
+    # assert train_micro_batch_size_per_gpu * gpu_num * gradient_accumulation == train_batch_size
     ds_config = get_train_ds_config(train_batch_size=train_batch_size,
                                     train_micro_batch_size_per_gpu=train_micro_batch_size_per_gpu,
                                     gradient_accumulation_steps=gradient_accumulation,
@@ -79,8 +79,8 @@ def main(args):
         "encoder_layers": encoder_layers,
         "language_layers": language_layers,
         "projector_type": "weighted_linear",
-        "batch": args.train_micro_batch_size_per_gpu,
-        "structure": args.structure
+        "batch": 4,
+        "structure": "Linear"
     }
     encoder_aligner_config = SimpleNamespace(**encoder_aligner_config)
 
@@ -93,15 +93,15 @@ def main(args):
         encoder_aligner_config=encoder_aligner_config,
         augmentation = augmentation
     )
-
+    init_checkpoint = "/root/LayAlign/outputs/LayAlign-xnli-test1/epoch_2_augmentation/pytorch_model.bin"
     model = LayAlign(model_config)
-    if args.init_checkpoint is not None:
-        init_checkpoint = args.init_checkpoint
+    if init_checkpoint is not None:
+        init_checkpoint = init_checkpoint
         checkpoint = torch.load(init_checkpoint, map_location='cpu')
         #model_dict = checkpoint['model_state_dict']
         model.load_state_dict(checkpoint, True)
         print('mapping init from:', init_checkpoint)
-    # model = model.cuda()
+    # model.to('cuda')
     parameters = filter(lambda p: p.requires_grad, model.parameters())
     model, optimizer, _, __ = deepspeed.initialize(
         config=ds_config,
@@ -144,81 +144,81 @@ def main(args):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--llm_path",
-        type=str,
-        default='../LLMs/MetaMath-7B-V1.0/'
-    )
-    parser.add_argument(
-        "--mt_path",
-        type=str,
-        default='../LLMs/mt5-xl/'
-    )
-    parser.add_argument(
-        "--init_checkpoint",
-        type=str,
-        default=None,
-    )
-    parser.add_argument(
-        "--save_name",
-        type=str,
-        default='MindMerger',
-    )
-    parser.add_argument(
-        "--task",
-        type=str,
-        default='math',
-    )
-    parser.add_argument(
-        "--eval_batch_size",
-        type=int,
-        default=8
-    )
-    parser.add_argument(
-        "--local_rank",
-        type=int,
-        default=0
-    )
-    parser.add_argument(
-        "--max_seq_len",
-        type=int,
-        default=512
-    )
-    parser.add_argument(
-        "--max_gen_len",
-        type=int,
-        default=512
-    )
-    parser.add_argument(
-        "--gpu",
-        type=str,
-        default='0'
-    )
-    parser.add_argument(
-        "--augmentation",
-        type=ast.literal_eval,
-        default=True
-    )
-    parser.add_argument(
-        "--train_batch_size",
-        type=int,
-        default=128
-    )
-    parser.add_argument(
-        "--structure",
-        type=str,
-        default='Linear'
-    )
-    parser.add_argument(
-        "--train_micro_batch_size_per_gpu",
-        type=int,
-        default=1
-    )
-    parser = deepspeed.add_config_arguments(parser)
-    args = parser.parse_args()
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument(
+    #     "--llm_path",
+    #     type=str,
+    #     default='../LLMs/MetaMath-7B-V1.0/'
+    # )
+    # parser.add_argument(
+    #     "--mt_path",
+    #     type=str,
+    #     default='../LLMs/mt5-xl/'
+    # )
+    # parser.add_argument(
+    #     "--init_checkpoint",
+    #     type=str,
+    #     default=None,
+    # )
+    # parser.add_argument(
+    #     "--save_name",
+    #     type=str,
+    #     default='MindMerger',
+    # )
+    # parser.add_argument(
+    #     "--task",
+    #     type=str,
+    #     default='math',
+    # )
+    # parser.add_argument(
+    #     "--eval_batch_size",
+    #     type=int,
+    #     default=8
+    # )
+    # parser.add_argument(
+    #     "--local_rank",
+    #     type=int,
+    #     default=0
+    # )
+    # parser.add_argument(
+    #     "--max_seq_len",
+    #     type=int,
+    #     default=512
+    # )
+    # parser.add_argument(
+    #     "--max_gen_len",
+    #     type=int,
+    #     default=512
+    # )
+    # parser.add_argument(
+    #     "--gpu",
+    #     type=str,
+    #     default='1'
+    # )
+    # parser.add_argument(
+    #     "--augmentation",
+    #     type=ast.literal_eval,
+    #     default=True
+    # )
+    # parser.add_argument(
+    #     "--train_batch_size",
+    #     type=int,
+    #     default=128
+    # )
+    # parser.add_argument(
+    #     "--structure",
+    #     type=str,
+    #     default='Linear'
+    # )
+    # parser.add_argument(
+    #     "--train_micro_batch_size_per_gpu",
+    #     type=int,
+    #     default=1
+    # )
+    # parser = deepspeed.add_config_arguments(parser)
+    # args = parser.parse_args()
 
-    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu
+    os.environ['CUDA_VISIBLE_DEVICES'] = "0"
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     set_seed(0)
 
@@ -237,8 +237,8 @@ if __name__ == "__main__":
         'German': 'deu_Latn', 'Spanish': 'spa_Latn', 'French': 'fra_Latn', 'Japanese': 'jpn_Jpan',
         'Russian': 'rus_Cyrl', 'Thai': 'tha_Thai'
     }
-    if 'nllb' in args.mt_path:
-        langs_map = langs_map_nllb
-    else:
-        langs_map = langs_map_m2m
-    main(args)
+    # if 'nllb' in args.mt_path:
+    #     langs_map = langs_map_nllb
+    # else:
+    langs_map = langs_map_m2m
+    main()
