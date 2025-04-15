@@ -10,3 +10,4 @@ wandb
 python-dotenv
 pytorch-lightning
 lightning
+scikit-learn
