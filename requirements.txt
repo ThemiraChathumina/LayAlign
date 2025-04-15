@@ -8,3 +8,5 @@ accelerate==0.31.0
 datasets
 wandb
 python-dotenv
+pytorch-lightning
+lightning
