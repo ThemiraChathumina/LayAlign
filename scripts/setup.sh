@@ -25,6 +25,10 @@ apt install -y git-lfs
 
 # Initialize git-lfs and clone the dataset
 git lfs install
-git clone https://huggingface.co/datasets/Themira/xnli_layalign
 
+apt install -y libmpich-dev
+apt install -y tmux
+apt install -y libopenmpi-dev
+
+pip install mpi4py
 # chmod +x setup.sh

@@ -32,7 +32,8 @@ logger = get_logger(__name__)
 directory = "./datas/query_translation/"
 os.makedirs(directory, exist_ok=True)
 
-
+directory = "./datas/evaluation/"
+os.makedirs(directory, exist_ok=True)
 
 def parse_args():
     parser = argparse.ArgumentParser()
