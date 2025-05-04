@@ -1,3 +1,7 @@
 from .OFEGEmbeddingModel import OFEGMultilingualEmbeddingModel
-
-__all__ = ["OFEGMultilingualEmbeddingModel"]
+from .SMLBEmbeddingModel import SMLBMultilingualEmbeddingModel
+from .JSMEmbeddingModel import JSMMultilingualEmbeddingModel
+__all__ = ["OFEGMultilingualEmbeddingModel"
+           , "SMLBMultilingualEmbeddingModel"
+              , "JSMMultilingualEmbeddingModel"
+           ]

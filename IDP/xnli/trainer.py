@@ -310,5 +310,6 @@ def main():
         print('save epoch model')
     accelerator.wait_for_everyone()
 
+    model.print_gates()
 if __name__ == "__main__":
     main()
