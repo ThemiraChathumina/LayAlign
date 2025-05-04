@@ -19,8 +19,8 @@ class Arguments:
         TOTAL_BATCH_SIZE=8
         GRADIENT_ACC_STEPS = TOTAL_BATCH_SIZE // BATCH_SIZE_PER_GPU
 
-        self.llm_path = "LLaMAX/LLaMAX2-7B-XNLI"
-        self.mt_path = "google/mt5-xl"
+        self.llm_path = "meta-llama/Llama-3.2-1B-Instruct"
+        self.mt_path = "google/mt5-large"
         self.ext_path = "facebook/nllb-200-distilled-600M"
         self.train_num = 8888
         self.dev_size = 1000
@@ -114,7 +114,7 @@ def main():
     stage_name = args.stage_name
     result_path_base = f'./results/{save_name}/{stage_name}/'
     output_model_path_base = f'./outputs/{save_name}/{stage_name}/'
-    tokenizer_m2m = AutoTokenizer.from_pretrained(mt_path)
+    # tokenizer_m2m = AutoTokenizer.from_pretrained(mt_path)
     tokenizer_llm = AutoTokenizer.from_pretrained(llm_path, use_fast=True)
     tokenizer_llm.pad_token = tokenizer_llm.eos_token
     tokenizer_llm.padding_side = "left"

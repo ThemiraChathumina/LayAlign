@@ -27,8 +27,8 @@ def construct_prompt(sample):
     return f"### Instruction:\nNews Sentence: {sample}\nClassify the given news sentence into one of the following categories.\nBusiness, Entertainment, Political, Sports, Science.\n\n### Response:"
 
 def main():
-    llm_path = "LLaMAX/LLaMAX2-7B-XNLI"
-    mt_path = "google/mt5-xl"
+    llm_path = "meta-llama/Llama-3.2-1B-Instruct"
+    mt_path = "google/mt5-large"
     ext_path = "facebook/nllb-200-distilled-600M"
     max_seq_len = 512
     max_gen_len = 512
