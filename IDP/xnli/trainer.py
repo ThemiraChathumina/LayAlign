@@ -308,8 +308,9 @@ def main():
         epoch_model_path = f'./outputs/{save_name}/epoch_{epoch}_{stage_name}/'
         save_with_accelerate(accelerator, model, epoch_model_path)
         print('save epoch model')
+    model.clean_up()
     accelerator.wait_for_everyone()
 
-    model.print_gates()
+    
 if __name__ == "__main__":
     main()

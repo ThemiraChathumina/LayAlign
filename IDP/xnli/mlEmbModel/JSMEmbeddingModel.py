@@ -3,6 +3,7 @@ import torch
 from transformers import AutoTokenizer
 from torch import nn
 import torch.nn.functional as F
+import csv 
 
 class JSMMultilingualEmbeddingModel(nn.Module):
     ALLOWED_MODELS = {
@@ -45,11 +46,15 @@ class JSMMultilingualEmbeddingModel(nn.Module):
         num_embedding_tokens = 1
         self.num_embedding_tokens = num_embedding_tokens
         self.learnable_queries_base = None
+        self.temp = 1e4
         
         # If using prepended queries, initialize them.
         if num_embedding_tokens > -1:
             self.num_layers = self.embedding_model_base.config.num_hidden_layers  # Exclude embedding layer
             self.layer_weights_lb = nn.Parameter(torch.full((self.num_layers, self.embedding_dim_base), 3e-5))
+        
+        self.csv_file = open("softmaxed_weights.csv", "a", newline="")
+        self.csv_writer = csv.writer(self.csv_file)
 
         
     def get_input_embeddings(self, model, input_ids):
@@ -112,7 +117,7 @@ class JSMMultilingualEmbeddingModel(nn.Module):
         # Skip embeddings layer (hidden_states[0]), only use actual transformer layers
         hidden_states_stacked = torch.stack(outputs.hidden_states[1:], dim=1)  # [B, L, T, D]
 
-        norm_weights = F.softmax(self.layer_weights_lb, dim=0)  # [L, D]
+        norm_weights = F.softmax(self.temp*self.layer_weights_lb, dim=0)  # [L, D]
         norm_weights = norm_weights.view(1, self.num_layers, 1, self.embedding_dim_base)
 
         fused_tokens = torch.sum(hidden_states_stacked * norm_weights, dim=1)  # [B, T, D]
@@ -122,14 +127,26 @@ class JSMMultilingualEmbeddingModel(nn.Module):
     
     def forward(self, encoded_inputs):
         base_embeddings, base_attention_mask = self.softmax_gated(
-            encoded_inputs,
-            self.learnable_queries_base
+            encoded_inputs
         )
+
+        with torch.no_grad():
+            softmaxed_weights = F.softmax(self.layer_weights_lb, dim=0).detach().cpu().numpy()
+            self.csv_writer.writerow(softmaxed_weights.flatten().tolist())
+
 
         return base_embeddings, base_attention_mask
 
+    def log_layer_weights(self):
+        for i, weight in enumerate(self.layer_weights_lb.data.cpu().numpy()):
+            f.write(f"Layer {i}: {weight}\n")
+    
     def print_softmax_gate(self):
         print("Softmax Gate Weights:")
         print(self.layer_weights_lb.data.cpu().numpy())
         print("Softmax Gate")
         print(F.softmax(self.layer_weights_lb, dim=0).data.cpu().numpy())
+
+    def close_csv(self):
+        if self.csv_file:
+            self.csv_file.close()

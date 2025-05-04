@@ -3,7 +3,7 @@ import torch
 from transformers import AutoTokenizer
 from torch import nn
 import torch.nn.functional as F
-from mlEmbModel import JSMEmbeddingModel
+from mlEmbModel import JSMMultilingualEmbeddingModel
 
 class MLP(nn.Module):
     def __init__(self, mt_dim, llm_dim):
@@ -102,7 +102,7 @@ class MPTModel(nn.Module):
         super(MPTModel, self).__init__()
         self.config = config  # Ensure there is a config attribute
         self.max_gen_len = config['max_gen_len']
-        self.encoder_mt = JSMEmbeddingModel(config['mt_path'], config['ext_path'], config['max_seq_len'])
+        self.encoder_mt = JSMMultilingualEmbeddingModel(config['mt_path'], config['ext_path'], config['max_seq_len'])
         
         model_llm = AutoModelForCausalLM.from_pretrained(config['llm_path'])
 
@@ -197,3 +197,6 @@ class MPTModel(nn.Module):
         
     def print_gates(self):
         self.encoder_mt.print_softmax_gate()
+
+    def clean_up(self):
+        self.encoder_mt.close_csv()
