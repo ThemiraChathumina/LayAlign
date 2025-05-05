@@ -304,6 +304,7 @@ def main():
                     avg_loss = accelerator.gather(total_loss).mean().item() / gradient_accumulation / args.logging_steps
                     total_loss = 0                   
                     print(f"  Step: {completed_steps}, LR: {lr_scheduler.get_last_lr()[0]}, Loss: {avg_loss}")
+                    model.log_gates()
                   
         epoch_model_path = f'./outputs/{save_name}/epoch_{epoch}_{stage_name}/'
         save_with_accelerate(accelerator, model, epoch_model_path)

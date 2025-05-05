@@ -194,7 +194,10 @@ class MPTModel(nn.Module):
                                     attention_mask=llm_input_mask,
                                     labels=labels)
             return output.loss
-        
+    
+    def log_gates(self):
+        self.encoder_mt.log_softmax_gate()
+
     def print_gates(self):
         self.encoder_mt.print_softmax_gate()
 
