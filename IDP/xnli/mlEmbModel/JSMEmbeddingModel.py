@@ -129,7 +129,7 @@ class JSMMultilingualEmbeddingModel(nn.Module):
         
     
     def forward(self, encoded_inputs):
-        if self.num_embedding_tokens > -1:
+        if not self.langbridge_baseline:
             base_embeddings, base_attention_mask = self.softmax_gated(
                 encoded_inputs
             )
