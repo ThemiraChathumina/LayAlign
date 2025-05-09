@@ -12,6 +12,7 @@ import math
 from model import MPTModel
 from utils import set_seed, save_with_accelerate
 from read_data import ExperimentDataset, llm_input_features
+from Configs import XNLIConfigs
 
 class Arguments:
     def __init__(self):
@@ -19,13 +20,15 @@ class Arguments:
         TOTAL_BATCH_SIZE=8
         GRADIENT_ACC_STEPS = TOTAL_BATCH_SIZE // BATCH_SIZE_PER_GPU
 
+        self.configs = XNLIConfigs()
+
         self.llm_path = "meta-llama/Llama-3.2-1B-Instruct"
         self.mt_path = "google/mt5-large"
         self.ext_path = "facebook/nllb-200-distilled-600M"
         self.train_num = 8888
         self.dev_size = 1000
         self.lr = 3e-5
-        self.epoch_num = 3
+        self.epoch_num = self.configs.num_epochs
         self.gradient_accumulation = GRADIENT_ACC_STEPS
         self.max_seq_len = 200
         self.max_gen_len = 200
@@ -33,13 +36,13 @@ class Arguments:
         self.eval_batch_size = BATCH_SIZE_PER_GPU
         self.train_micro_batch_size_per_gpu = BATCH_SIZE_PER_GPU
         self.augmentation = False
-        self.save_name = 'xnli'
-        self.stage_name = 'no_aug'
+        self.save_name = self.configs.save_name
+        self.stage_name = self.configs.args
         self.report_to = 'wandb'
         self.logging_steps = 1000
         self.warm_rate = 0.05
         self.lr_scheduler_name = 'cosine'
-        self.system_prompt = "Classify the relationship between the premise and hypothesis as one of: entailment, contradiction, or neutral. Reply with only the label."
+        self.system_prompt = self.configs.system_prompt
         self.init_checkpoint = None
 
 def apply_chat_template(system_prompt, user_prompt, tokenizer_llm, tokenize=False, add_generation_prompt=True):
@@ -57,6 +60,9 @@ def apply_chat_template(system_prompt, user_prompt, tokenizer_llm, tokenize=Fals
 def main():
     
     args = Arguments()
+
+    configs = args.configs
+    
     
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     accelerator_log_kwargs = {}
@@ -78,7 +84,7 @@ def main():
 
     train_samples = []
 
-    ds = load_dataset("facebook/xnli", "en")
+    ds = load_dataset("facebook/xnli", configs.lang)
 
     train_ds = ds['train']
 
@@ -87,7 +93,7 @@ def main():
         premise = example['premise']
         hypothesis = example['hypothesis']
         labels = {0:'Entailment', 1:'Neutral', 2:'Contradiction'}
-        sentence = f"Premise: {premise.strip()} Hypothesis: {hypothesis.strip()} Label:"
+        sentence = f"{configs.getPremise()}: {premise.strip()} {configs.getHypothesis()}: {hypothesis.strip()} {configs.getLabel()}: "
         label = f"{labels[int(example['label'])]}"
     
         sample = {

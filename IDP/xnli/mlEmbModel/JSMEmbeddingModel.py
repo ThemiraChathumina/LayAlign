@@ -5,6 +5,7 @@ from torch import nn
 import torch.nn.functional as F
 import csv 
 import numpy as np
+from Configs import XNLIConfigs
 
 class JSMMultilingualEmbeddingModel(nn.Module):
     ALLOWED_MODELS = {
@@ -54,10 +55,12 @@ class JSMMultilingualEmbeddingModel(nn.Module):
             self.layer_weights_lb = nn.Parameter(torch.full((self.num_layers,), 3e-5))
             self.temp = nn.Parameter(torch.tensor(1e2))
         
-        self.csv_file = open("softmaxed_weights.csv", "a", newline="")
-        self.csv_writer = csv.writer(self.csv_file)
+       
+        self.configs = XNLIConfigs()
 
-        self.langbridge_baseline = False
+        self.langbridge_baseline = self.configs.baseline
+        self.csv_file = open(self.configs.gate_csv_path, "a", newline="")
+        self.csv_writer = csv.writer(self.csv_file)
 
         
     def get_input_embeddings(self, model, input_ids):

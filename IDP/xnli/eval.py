@@ -23,6 +23,8 @@ from utils import get_train_ds_config, set_seed, evaluate_classification
 from model import MPTModel
 from read_data import ExperimentDataset, llm_input_features
 
+from Configs import XNLIConfigs
+
 def construct_prompt(sample):
     return f"### Instruction:\nNews Sentence: {sample}\nClassify the given news sentence into one of the following categories.\nBusiness, Entertainment, Political, Sports, Science.\n\n### Response:"
 
@@ -40,6 +42,8 @@ def apply_chat_template(system_prompt, user_prompt, tokenizer_llm, tokenize=Fals
     return chat_prompt
 
 def main():
+    confings = XNLIConfigs()
+
     llm_path = "meta-llama/Llama-3.2-1B-Instruct"
     mt_path = "google/mt5-large"
     ext_path = "facebook/nllb-200-distilled-600M"
@@ -50,8 +54,8 @@ def main():
     save_name = "no_aug"
     task = "xnli"
         
-    system_prompt = "Classify the relationship between the premise and hypothesis as one of: entailment, contradiction, or neutral. Reply with only the label."
-    
+    system_prompt = confings.system_prompt
+
     result_path_base = f'./results/{save_name}/{task}/'
 
     token = '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'
@@ -68,7 +72,7 @@ def main():
             premise = example['premise']
             hypothesis = example['hypothesis']
             labels = {0:'Entailment', 1:'Neutral', 2:'Contradiction'}
-            sentence = f"Premise: {premise.strip()} Hypothesis: {hypothesis.strip()} Label:"
+            sentence = f"{confings.getPremise()}: {premise.strip()} {confings.getHypothesis()}: {hypothesis.strip()} {confings.getLabel()}:"
             label = f"{labels[int(example['label'])]}"
             sample = {
                 'prompt': sentence,
@@ -112,9 +116,10 @@ def main():
         'augmentation' :  augmentation,
         'max_seq_len': max_seq_len
     }
-    init_checkpoint = "/root/LayAlign/prefix_xnli/pytorch_model.bin"
+    
+    init_checkpoint = confings.checkpoint
 
-    apply_chat_template_func = lambda user_prompt: apply_chat_template(system_prompt, user_prompt, tokenizer_llm)
+    
 
     model = MPTModel(model_config)
     if init_checkpoint is not None:
