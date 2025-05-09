@@ -5,6 +5,18 @@ from tqdm import tqdm
 from read_data import llm_input_features
 import numpy as np
 
+def apply_chat_template(system_prompt, user_prompt, tokenizer_llm, tokenize=False, add_generation_prompt=True):
+    # This function is a placeholder for the actual implementation of applying a chat template.
+    # In a real scenario, this would format the prompt according to the requirements of the model.
+    user_prompts = [{
+                        "role": "system", "content": system_prompt
+                    },
+                    {
+                        "role": "user", "content": user_prompt
+                    }]
+    chat_prompt = tokenizer_llm.apply_chat_template(user_prompts, tokenize=tokenize, add_generation_prompt=add_generation_prompt)
+    return chat_prompt
+
 def set_seed(seed):
     os.environ['PYTHONHASHSEED'] = str(seed)
     torch.manual_seed(seed)  # cpu
@@ -90,14 +102,26 @@ def get_train_ds_config(train_batch_size=1,
         },
     }
 
-def evaluate_classification(model, test_set, tokenizer_llm, max_gen_len, use_prompt):
+def evaluate_classification(model, test_set, tokenizer_llm, max_gen_len, use_prompt, system_prompt=None):
+
+    chat_function = lambda user_prompt: apply_chat_template(system_prompt, user_prompt, tokenizer_llm)
+    
     model.eval()
     results_list = []
     hit = 0
     step_trange = tqdm(test_set)
     preds, golds = [], []
+    
     for test_step in step_trange:
-        prompts = test_step['prompt']
+    
+        if system_prompt is not None:
+            if isinstance(test_step['prompt'], str):
+                prompts = [chat_function(test_step['prompt'])]
+            else:
+                prompts = [chat_function(prompt) for prompt in test_step['prompt']]
+        else:
+            prompts = test_step['prompt']
+        
         targets = test_step['target']
         input_ids_prompt, mask_prompt = None, None
         if use_prompt:

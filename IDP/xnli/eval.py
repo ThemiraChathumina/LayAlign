@@ -26,6 +26,19 @@ from read_data import ExperimentDataset, llm_input_features
 def construct_prompt(sample):
     return f"### Instruction:\nNews Sentence: {sample}\nClassify the given news sentence into one of the following categories.\nBusiness, Entertainment, Political, Sports, Science.\n\n### Response:"
 
+
+def apply_chat_template(system_prompt, user_prompt, tokenizer_llm, tokenize=False, add_generation_prompt=True):
+    # This function is a placeholder for the actual implementation of applying a chat template.
+    # In a real scenario, this would format the prompt according to the requirements of the model.
+    user_prompts = [{
+                        "role": "system", "content": system_prompt
+                    },
+                    {
+                        "role": "user", "content": user_prompt
+                    }]
+    chat_prompt = tokenizer_llm.apply_chat_template(user_prompts, tokenize=tokenize, add_generation_prompt=add_generation_prompt)
+    return chat_prompt
+
 def main():
     llm_path = "meta-llama/Llama-3.2-1B-Instruct"
     mt_path = "google/mt5-large"
@@ -37,6 +50,7 @@ def main():
     save_name = "no_aug"
     task = "xnli"
         
+    system_prompt = "Classify the relationship between the premise and hypothesis as one of: entailment, contradiction, or neutral. Reply with only the label."
     
     result_path_base = f'./results/{save_name}/{task}/'
 
@@ -99,6 +113,9 @@ def main():
         'max_seq_len': max_seq_len
     }
     init_checkpoint = "/root/LayAlign/prefix_xnli/pytorch_model.bin"
+
+    apply_chat_template_func = lambda user_prompt: apply_chat_template(system_prompt, user_prompt, tokenizer_llm)
+
     model = MPTModel(model_config)
     if init_checkpoint is not None:
         init_checkpoint = init_checkpoint
@@ -126,7 +143,7 @@ def main():
             shuffle=False,
             num_workers=1,
             drop_last=False)
-        acc, results_list = evaluate_classification(model, test_set, tokenizer_llm, max_gen_len, augmentation)
+        acc, results_list = evaluate_classification(model, test_set, tokenizer_llm, max_gen_len, augmentation, system_prompt)
         
         print('test_lang:', test_lang, 'acc:', acc)
         scores_map[test_lang] = acc

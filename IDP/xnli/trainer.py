@@ -39,7 +39,7 @@ class Arguments:
         self.logging_steps = 10
         self.warm_rate = 0.05
         self.lr_scheduler_name = 'cosine'
-        self.system_prompt = None
+        self.system_prompt = "Classify the relationship between the premise and hypothesis as one of: entailment, contradiction, or neutral. Reply with only the label."
         self.init_checkpoint = None
 
 def apply_chat_template(system_prompt, user_prompt, tokenizer_llm, tokenize=False, add_generation_prompt=True):
