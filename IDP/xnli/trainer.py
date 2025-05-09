@@ -42,6 +42,18 @@ class Arguments:
         self.system_prompt = None
         self.init_checkpoint = None
 
+def apply_chat_template(system_prompt, user_prompt, tokenizer_llm, tokenize=False, add_generation_prompt=True):
+    # This function is a placeholder for the actual implementation of applying a chat template.
+    # In a real scenario, this would format the prompt according to the requirements of the model.
+    user_prompts = [{
+                        "role": "system", "content": system_prompt
+                    },
+                    {
+                        "role": "user", "content": user_prompt
+                    }]
+    chat_prompt = tokenizer_llm.apply_chat_template(user_prompts, tokenize=tokenize, add_generation_prompt=add_generation_prompt)
+    return chat_prompt
+
 def main():
     
     args = Arguments()
@@ -120,6 +132,9 @@ def main():
     tokenizer_llm.padding_side = "left"
     # tokenizer_llm.pad_token = "[PAD]"
 
+    system_prompt = args.system_prompt
+    apply_chat_template_func = lambda user_prompt: apply_chat_template(system_prompt, user_prompt, tokenizer_llm)
+    
     print(json.dumps({
         'llm_path': llm_path,
         'mt_path': mt_path,
@@ -179,7 +194,7 @@ def main():
 
     # Log a few random samples from the training set:
     for index in random.sample(range(len(train_set)), 3):
-        print(f"Sample {index} of the training set: {train_set[index]}.")
+        print(f"Sample {index} of the training set: {apply_chat_template_func(train_set[index])}.")
     
     # Optimizer
     optimizer = torch.optim.AdamW(parameters, betas=[0.8,0.999], eps=1e-8, weight_decay=3e-7, lr=args.lr)
@@ -262,6 +277,7 @@ def main():
                                                         max_gen_len, add_bos_token, add_eos_token)
 
                 input_ids_prompt, mask_prompt = None, None
+                
                 if augmentation:
                     add_bos_token = False
                     add_eos_token = False
@@ -284,9 +300,14 @@ def main():
                     input_ids_prompt, mask_prompt = llm_input_features(llm_input_prompts, tokenizer_llm,
                                                                         max_gen_len, add_bos_token,
                                                                         add_eos_token)
-                output_loss = model(sources,
+
+
+                input_prompts = [apply_chat_template_func(source) for source in sources]
+
+                output_loss = model(input_prompts,
                             input_ids_prompt=input_ids_prompt, mask_prompt=mask_prompt,
                             labels=labels, mask_label=mask_label)
+                
                 loss = output_loss
                 total_loss += output_loss.detach().float()
                 # We keep track of the loss at each logged step

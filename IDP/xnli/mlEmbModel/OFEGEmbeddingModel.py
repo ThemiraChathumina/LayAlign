@@ -51,7 +51,8 @@ class OFEGMultilingualEmbeddingModel(nn.Module):
             self.num_layers = self.embedding_model_base.config.num_hidden_layers
             print("Appending lb params to front", self.num_layers)
             self.layerwise_queries = nn.Parameter(torch.randn(self.num_layers, self.embedding_dim_base))
-            self.query_gates = nn.Parameter(torch.ones(self.num_layers, self.embedding_dim_base))
+            self.query_gates = nn.Parameter(torch.full((self.num_layers, self.embedding_dim_base), 1e-5))
+            self.temp = 1e5
         
     def get_input_embeddings(self, model, input_ids):
         if "M2M" in model.__class__.__name__:
@@ -131,7 +132,7 @@ class OFEGMultilingualEmbeddingModel(nn.Module):
             query_outputs.append(query_token_i)
 
         query_outputs = torch.cat(query_outputs, dim=1)  # [B, n, D]
-        gates = torch.sigmoid(self.query_gates)  # [L, D]
+        gates = torch.sigmoid(self.temp*self.query_gates)  # [L, D]
         gated_queries = query_outputs * gates.unsqueeze(0)  # [B, L, D] * [1, L, D]
 
         # Final token outputs (exclude the first n learnable tokens)

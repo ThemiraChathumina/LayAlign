@@ -52,9 +52,12 @@ class JSMMultilingualEmbeddingModel(nn.Module):
         if num_embedding_tokens > -1:
             self.num_layers = self.embedding_model_base.config.num_hidden_layers  # Exclude embedding layer
             self.layer_weights_lb = nn.Parameter(torch.full((self.num_layers,), 3e-5))
+            self.temp = nn.Parameter(torch.tensor(1e2))
         
         self.csv_file = open("softmaxed_weights.csv", "a", newline="")
         self.csv_writer = csv.writer(self.csv_file)
+
+        self.langbridge_baseline = False
 
         
     def get_input_embeddings(self, model, input_ids):
@@ -117,8 +120,7 @@ class JSMMultilingualEmbeddingModel(nn.Module):
         # Skip embeddings layer (hidden_states[0]), only use actual transformer layers
         hidden_states_stacked = torch.stack(outputs.hidden_states[1:], dim=1)  # [B, L, T, D]
 
-        normalized_weights = self.layer_weights_lb / self.layer_weights_lb.max()
-        norm_weights = F.softmax(normalized_weights, dim=0)  # [L]
+        norm_weights = F.softmax(self.temp*self.layer_weights_lb, dim=0)  # [L]
         norm_weights = norm_weights.view(1, -1, 1, 1)
 
         fused_tokens = torch.sum(hidden_states_stacked * norm_weights, dim=1)  # [B, T, D]
@@ -127,23 +129,29 @@ class JSMMultilingualEmbeddingModel(nn.Module):
         
     
     def forward(self, encoded_inputs):
-        base_embeddings, base_attention_mask = self.softmax_gated(
-            encoded_inputs
-        )
+        if self.num_embedding_tokens > -1:
+            base_embeddings, base_attention_mask = self.softmax_gated(
+                encoded_inputs
+            )
+        else:
+            base_embeddings, base_attention_mask = self.get_last_hidden_states(
+                encoded_inputs
+            )
         return base_embeddings, base_attention_mask
+        
     
     def log_softmax_gate(self):
-        with torch.no_grad():
-            normalized_weights = self.layer_weights_lb / self.layer_weights_lb.max()
-            softmaxed_weights = F.softmax(normalized_weights, dim=0).detach().to(torch.float32).cpu().numpy()
-            np.round(softmaxed_weights, decimals=4)
-            self.csv_writer.writerow(softmaxed_weights.flatten().tolist())
+        if not self.langbridge_baseline:
+            with torch.no_grad():
+                softmaxed_weights = F.softmax(self.temp*self.layer_weights_lb, dim=0).detach().to(torch.float32).cpu().numpy()
+                np.round(softmaxed_weights, decimals=4)
+                self.csv_writer.writerow(softmaxed_weights.flatten().tolist())
             
     def print_softmax_gate(self):
         print("Softmax Gate Weights:")
         print(self.layer_weights_lb.data.cpu().numpy())
         print("Softmax Gate")
-        print(F.softmax(self.layer_weights_lb, dim=0).data.cpu().numpy())
+        print(F.softmax(self.temp*self.layer_weights_lb, dim=0).data.cpu().numpy())
 
     def close_csv(self):
         if self.csv_file:
