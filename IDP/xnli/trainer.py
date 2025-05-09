@@ -36,7 +36,7 @@ class Arguments:
         self.save_name = 'xnli'
         self.stage_name = 'no_aug'
         self.report_to = 'wandb'
-        self.logging_steps = 10
+        self.logging_steps = 1000
         self.warm_rate = 0.05
         self.lr_scheduler_name = 'cosine'
         self.system_prompt = "Classify the relationship between the premise and hypothesis as one of: entailment, contradiction, or neutral. Reply with only the label."
@@ -301,8 +301,11 @@ def main():
                                                                         max_gen_len, add_bos_token,
                                                                         add_eos_token)
 
-
-                input_prompts = [apply_chat_template_func(source) for source in sources]
+                
+                if system_prompt is not None:
+                    input_prompts = [apply_chat_template_func(source) for source in sources]
+                else:
+                    input_prompts = sources
 
                 output_loss = model(input_prompts,
                             input_ids_prompt=input_ids_prompt, mask_prompt=mask_prompt,
