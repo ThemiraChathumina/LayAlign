@@ -90,7 +90,7 @@ class JSMMultilingualEmbeddingModel(nn.Module):
         return input_ids_m2m, attention_mask_m2m
     
     def get_last_hidden_states(self, encoded_inputs):
-        input_ids, attention_mask = self.mt_input_features(encoded_inputs, source_languages=source_languages)
+        input_ids, attention_mask = self.mt_input_features(encoded_inputs)
         outputs = self.embedding_model_base(input_ids=input_ids, attention_mask=attention_mask)
         return outputs.last_hidden_state, attention_mask
     
