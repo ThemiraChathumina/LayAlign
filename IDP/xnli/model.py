@@ -41,7 +41,7 @@ class LinearMapper(nn.Module):
 class Mapping(nn.Module):
     def __init__(self, mt_dim, llm_dim):
         super(Mapping, self).__init__()
-        self.mlp = LinearMapper(mt_dim, llm_dim)
+        self.mlp = MLP(mt_dim, llm_dim)
         self.end_boundary = nn.Parameter(
             torch.zeros(1, 1, llm_dim), requires_grad=True
         )

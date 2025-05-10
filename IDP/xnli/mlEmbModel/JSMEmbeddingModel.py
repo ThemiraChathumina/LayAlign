@@ -89,26 +89,10 @@ class JSMMultilingualEmbeddingModel(nn.Module):
         attention_mask_m2m = torch.tensor(attention_mask_m2m, dtype=torch.long).cuda()
         return input_ids_m2m, attention_mask_m2m
     
-    def get_last_hidden_states(self, encoded_inputs, source_languages, queries = None):
+    def get_last_hidden_states(self, encoded_inputs):
         input_ids, attention_mask = self.mt_input_features(encoded_inputs, source_languages=source_languages)
-        batch_size = input_ids.shape[0]
-        
-        if self.num_embedding_tokens > -1:
-            inputs_embeds = self.get_input_embeddings(self.embedding_model_base, input_ids)  # [B, L, D]
-            
-            queries = queries.unsqueeze(0).expand(batch_size, -1, -1)  # [B, Q, D]
-            
-            combined_inputs = torch.cat([queries, inputs_embeds], dim=1)  # [B, Q+L, D]
-            
-            query_mask = torch.ones(batch_size, self.num_embedding_tokens, dtype=attention_mask.dtype, device=attention_mask.device)
-            combined_attention_mask = torch.cat([query_mask, attention_mask], dim=1)  # [B, Q+L]
-            
-            outputs = self.embedding_model_base(inputs_embeds=combined_inputs, attention_mask=combined_attention_mask)
-            
-            return outputs.last_hidden_state, combined_attention_mask
-        else:
-            outputs = self.embedding_model_base(input_ids=input_ids, attention_mask=attention_mask)
-            return outputs.last_hidden_state, attention_mask
+        outputs = self.embedding_model_base(input_ids=input_ids, attention_mask=attention_mask)
+        return outputs.last_hidden_state, attention_mask
     
     def softmax_gated(self, encoded_inputs):
         input_ids, attention_mask = self.mt_input_features(encoded_inputs)
