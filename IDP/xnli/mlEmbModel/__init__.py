@@ -3,10 +3,12 @@ from .SMLBEmbeddingModel import SMLBMultilingualEmbeddingModel
 from .JSMEmbeddingModel import JSMMultilingualEmbeddingModel
 from .LBSMEmbeddingModel import LBSMMultilingualEmbeddingModel
 from .ATEmbeddingModel import ATMultilingualEmbeddingModel
+from .TransSMEmbeddingModel import TransSMMultilingualEmbeddingModel
 
 __all__ = ["OFEGMultilingualEmbeddingModel"
            , "SMLBMultilingualEmbeddingModel"
               , "JSMMultilingualEmbeddingModel"
               , "LBSMMultilingualEmbeddingModel"
               , "ATMultilingualEmbeddingModel"
+              , "TransSMMultilingualEmbeddingModel"
            ]
