@@ -3,7 +3,7 @@ import torch
 from transformers import AutoTokenizer
 from torch import nn
 import torch.nn.functional as F
-from mlEmbModel import TransSMMultilingualEmbeddingModel
+from mlEmbModel import CATMultilingualEmbeddingModel
 
 class MLP(nn.Module):
     def __init__(self, mt_dim, llm_dim):
@@ -41,7 +41,7 @@ class LinearMapper(nn.Module):
 class Mapping(nn.Module):
     def __init__(self, mt_dim, llm_dim):
         super(Mapping, self).__init__()
-        self.mlp = MLP(mt_dim, llm_dim)
+        self.mlp = LinearMapper(mt_dim, llm_dim)
         self.end_boundary = nn.Parameter(
             torch.zeros(1, 1, llm_dim), requires_grad=True
         )
@@ -110,7 +110,7 @@ class MPTModel(nn.Module):
         super(MPTModel, self).__init__()
         self.config = config  # Ensure there is a config attribute
         self.max_gen_len = config['max_gen_len']
-        self.encoder_mt = TransSMMultilingualEmbeddingModel(config['mt_path'], config['ext_path'], config['max_seq_len'])
+        self.encoder_mt = CATMultilingualEmbeddingModel(config['mt_path'], config['ext_path'], config['max_seq_len'])
 
         model_llm = AutoModelForCausalLM.from_pretrained(config['llm_path'])
 
