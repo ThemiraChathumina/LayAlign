@@ -3,7 +3,7 @@ import torch
 from transformers import AutoTokenizer
 from torch import nn
 import torch.nn.functional as F
-
+import random
 
 class MLP(nn.Module):
     def __init__(self, mt_dim, llm_dim):
@@ -33,7 +33,7 @@ class Mapper(nn.Module):
 class Mapping(nn.Module):
     def __init__(self, mt_dim, llm_dim):
         super(Mapping, self).__init__()
-        self.mlp = Mapper(mt_dim, llm_dim)
+        self.mlp = MLP(mt_dim, llm_dim)
         self.end_boundary = nn.Parameter(
             torch.zeros(1, 1, llm_dim), requires_grad=True
         )
@@ -44,58 +44,32 @@ class Mapping(nn.Module):
     def get_embed(self):
         return self.end_boundary
 
-class FusionBlock(nn.Module):
-    def __init__(self, d_model, d_encoder, d_text, d_out, num_heads=8, num_layers=1, num_queries = 16):
-        super(FusionBlock, self).__init__()
-        self.num_queries = num_queries
-        self.learnable_queries = nn.Parameter(torch.randn(num_queries, d_model))
-        self.encoder_mapper = MLP(d_encoder, d_model)
-        self.text_mapper = MLP(d_text, d_model)
-        self.out_proj = MLP(d_model, d_out)
-        qformer_layer = nn.TransformerDecoderLayer(d_model, num_heads)
-        self.qformer = nn.TransformerDecoder(qformer_layer, num_layers)
     
-    def forward(self, enc_embedding, enc_attention_mask, text_embedding, text_attention_mask):
-        # enc_embedding: [batch_size, seq_len, d_encoder]
-        # enc_attention_mask: [batch_size, seq_len]
-    
-        batch_size = enc_embedding.size(0)
-        seq_len = enc_embedding.size(1)
-    
-        # Step 1: Map encoder embeddings to d_model dimension
-        memory = self.encoder_mapper(enc_embedding)  # [batch_size, seq_len, d_model]
-        text = self.text_mapper(text_embedding)
-        
-        # Step 2: Prepare learnable query tokens as target input
-        # Expand queries for batch dimension
-        tgt = self.learnable_queries.unsqueeze(0).expand(batch_size, -1, -1)  # [batch_size, num_queries, d_model]
+class LayerWeights(nn.Module):
+    def __init__(self, hidden_size, num_layers):
+        super(LayerWeights, self).__init__()
+        # <-- enable batch_first so nested_tensor path is used and warning disappears
+        encoder_layer = nn.TransformerEncoderLayer(
+            d_model=hidden_size,
+            nhead=1,
+            batch_first=True
+        )
+        self.transformerEncoder = nn.TransformerEncoder(
+            encoder_layer,
+            num_layers=1,
+        )
+        self.layer_pos_emb = nn.Parameter(torch.randn(num_layers, hidden_size))
+        self.cls = nn.Parameter(torch.zeros(1, 1, hidden_size), requires_grad=True)
+        self.layer_weights = nn.Linear(hidden_size, num_layers)
 
-        # Step 3: Create attention masks
-        tgt_attention_mask = torch.ones((batch_size, tgt.size(1)), dtype=torch.bool, device=enc_embedding.device)  # [batch_size, num_queries]
-        tgt_attention_mask = torch.cat([tgt_attention_mask, text_attention_mask], dim=1)
-        tgt = torch.cat([tgt, text], dim=1)
-        
-        # Convert attention masks to key padding masks (True = masked)
-        memory_key_padding_mask = ~enc_attention_mask.bool()  # [batch_size, seq_len]
-        tgt_key_padding_mask = ~tgt_attention_mask.bool()     # [batch_size, num_queries]
-
-        # Transformer expects shape: [tgt_len, batch_size, d_model] and [mem_len, batch_size, d_model]
-        tgt = tgt.transpose(0, 1)        # [num_queries, batch_size, d_model]
-        memory = memory.transpose(0, 1)  # [seq_len, batch_size, d_model]
-    
-        # Step 4: Run Q-Former decoder
-        qformer_output = self.qformer(
-            tgt,
-            memory,
-            tgt_key_padding_mask=tgt_key_padding_mask,
-            memory_key_padding_mask=memory_key_padding_mask
-        )  # [num_queries, batch_size, d_model]
-    
-        # Step 5: Project Q-Former output to output dimension
-        qformer_output = qformer_output.transpose(0, 1)  # [batch_size, num_queries, d_model]
-        output = self.out_proj(qformer_output)           # [batch_size, num_queries, d_out]
-    
-        return output[:,:self.num_queries], tgt_attention_mask[:,:self.num_queries]
+    def forward(self, x):
+        # x: [B, num_layers, hidden]
+        x = x + self.layer_pos_emb                  # [B, num_layers, hidden]
+        x = torch.cat([self.cls.expand(x.size(0), -1, -1), x], dim=1)
+        x = self.transformerEncoder(x)              # [B, num_layers+1, hidden]
+        x = x[:, 0, :]                              # [B, hidden]
+        x = self.layer_weights(x)                   # [B, num_layers]
+        return F.softmax(x, dim=-1)
 
 class MultilingualEmbeddingModel(nn.Module):
     ALLOWED_MODELS = {
@@ -143,48 +117,17 @@ class MultilingualEmbeddingModel(nn.Module):
 
         self.max_seq_len = max_seq_len
         
-        self.num_embedding_tokens = 1
+        # for softmax gating
+        num_layers = self.embedding_model_base.config.num_hidden_layers
+        self.layer_weights = LayerWeights(self.embedding_dim, num_layers)
         
-        self.num_layers = self.embedding_model_base.config.num_hidden_layers + 1
-        # Learnable query tokens
-        self.query_tokens = nn.Parameter(
-            torch.randn(1, self.num_embedding_tokens, self.embedding_dim)
-        )  # [1, Q, D]
 
-        # Scalar weights for each layer (same for all tokens)
-        self.layer_weights = nn.Parameter(torch.ones(self.num_layers))  # [L]
-
-        # self.fusion_block = FusionBlock(
-        #     d_model = self.embedding_dim_base,
-        #     d_encoder = self.embedding_dim_ext,
-        #     d_text = self.embedding_dim_base,
-        #     d_out = self.embedding_dim
-        # )
-        # self.num_embedding_tokens = 2
-        # self.learnable_queries_base = nn.Parameter(torch.randn(self.num_embedding_tokens, self.embedding_dim_base))
-        
     def get_input_embeddings(self, model, input_ids):
         if "M2M" in model.__class__.__name__:
             return model.embed_tokens(input_ids)
         return model.get_input_embeddings()(input_ids)
     
     def get_last_hidden_states(self, encoded_inputs, model, tokenizer):
-        # input_ids, attention_mask = self.mt_input_features(encoded_inputs, tokenizer)
-        # batch_size = input_ids.shape[0]
-        
-        # inputs_embeds = self.get_input_embeddings(model, input_ids)  # [B, L, D]
-        
-        # queries = self.learnable_queries_base.unsqueeze(0).expand(batch_size, -1, -1)  # [B, Q, D]
-        
-        # combined_inputs = torch.cat([queries, inputs_embeds], dim=1)  # [B, Q+L, D]
-        
-        # query_mask = torch.ones(batch_size, self.num_embedding_tokens, dtype=attention_mask.dtype, device=attention_mask.device)
-        # combined_attention_mask = torch.cat([query_mask, attention_mask], dim=1)  # [B, Q+L]
-        
-        # outputs = model(inputs_embeds=combined_inputs, attention_mask=combined_attention_mask)
-        
-        # return outputs.last_hidden_state, combined_attention_mask
-        
         input_ids, attention_mask = self.mt_input_features(encoded_inputs, tokenizer)
         outputs = model(input_ids=input_ids, attention_mask=attention_mask)
         return outputs.last_hidden_state, attention_mask
@@ -210,27 +153,12 @@ class MultilingualEmbeddingModel(nn.Module):
         attention_mask_m2m = torch.tensor(attention_mask_m2m, dtype=torch.long).cuda()
         return input_ids_m2m, attention_mask_m2m
     
-    def softmax_gated(self, encoded_inputs, tokenizer, queries=None):
+    def softmax_gated(self, encoded_inputs, tokenizer):
+        # 1) tokenize & get attention mask
         input_ids, attention_mask = self.mt_input_features(encoded_inputs, tokenizer)
 
-        inputs_embeds = self.get_input_embeddings(self.embedding_model_base, input_ids)  # [B, T, D]
-        batch_size = inputs_embeds.size(0)
-
-        
-        # Expand and prepend learnable query tokens
-        if queries is None:
-            raise ValueError("Query tokens must be provided.")
-        num_query_tokens = queries.size(1)
-        expanded_queries = queries.expand(batch_size, -1, -1)  # [B, Q, D]
-
-        # Prepend query tokens to embeddings
-        inputs_embeds = torch.cat([expanded_queries, inputs_embeds], dim=1)  # [B, Q+T, D]
-
-        # Adjust attention mask accordingly
-        query_mask = torch.ones(batch_size, num_query_tokens, dtype=attention_mask.dtype, device=attention_mask.device)
-        attention_mask = torch.cat([query_mask, attention_mask], dim=1)  # [B, Q+T]
-
-        # Forward through encoder with all hidden states
+        # 2) embed + encoder pass with all hidden‐states
+        inputs_embeds = self.get_input_embeddings(self.embedding_model_base, input_ids)
         outputs = self.embedding_model_base(
             inputs_embeds=inputs_embeds,
             attention_mask=attention_mask,
@@ -238,46 +166,50 @@ class MultilingualEmbeddingModel(nn.Module):
             return_dict=True,
         )
 
-        # Get all hidden states: tuple of length L+1 each [B, Q+T, D]
-        hidden_states = outputs.hidden_states  # len = num_layers + 1
+        # 3) stack only the transformer layers (skip the embedding layer)
+        #    hidden_states: tuple length = num_layers+1
+        #    layer_hs: [batch, num_layers, seq_len, hidden_dim]
+        layer_hs = torch.stack(outputs.hidden_states[1:], dim=1)
+        B, L, T, D = layer_hs.size()
 
-        # Extract query token representations from each layer
-        # => [B, L, Q, D]
-        per_layer_query_states = torch.stack([
-            layer[:, :num_query_tokens, :] for layer in hidden_states
-        ], dim=1)
+        # 4) rearrange to [B*T, L, D] so each token is an example
+        layered = layer_hs.permute(0, 2, 1, 3)           # [B, T, L, D]
+        x_flat = layered.reshape(B * T, L, D)           # [B*T, L, D]
 
-        # Learnable layer weights
-        norm_weights = F.softmax(self.layer_weights, dim=0)  # [L]
-        norm_weights = norm_weights.view(1, -1, 1, 1)         # [1, L, 1, 1]
+        # 5) select only real tokens
+        mask_flat = attention_mask.reshape(-1).bool()   # [B*T]
+        valid_x = x_flat[mask_flat]                     # [N_valid, L, D]
 
-        # Weighted sum across layers
-        fused_queries = torch.sum(per_layer_query_states * norm_weights, dim=1)  # [B, Q, D]
-        # Extract last hidden state and remove query token positions
-        last_hidden = outputs.last_hidden_state[:, num_query_tokens:, :]  # [B, T, D]
+        # 6) compute per‐token layer‐weights only for valid tokens
+        valid_w = self.layer_weights(valid_x)           # [N_valid, L]
 
-        # Concatenate fused queries + last layer's token representations
-        full_embeddings = torch.cat([fused_queries, last_hidden], dim=1)  # [B, Q+T, D]
+        # 7) scatter back into full-weight tensor (zeros for padding tokens)
+        weights_flat = x_flat.new_zeros(B * T, L)       # [B*T, L]
+        weights_flat[mask_flat] = valid_w               # fill only real tokens
+        weights = weights_flat.view(B, T, L)            # [B, T, L]
 
-        return full_embeddings, attention_mask
+        # 8) weighted sum over layers → [B, T, D]
+        gated_flat = (x_flat * weights_flat.unsqueeze(-1)).sum(dim=1)  # [B*T, D]
+        gated = gated_flat.view(B, T, D)                              # [B, T, D]
+
+        # 9) ensure padding stays zero
+        gated = gated * attention_mask.unsqueeze(-1)                  # [B, T, D]
+
+        return gated, attention_mask
+
     
     def forward(self, encoded_inputs):
         base_embeddings, base_attention_mask = self.softmax_gated(
             encoded_inputs, 
             self.tokenizer_base,
-            self.query_tokens
         )
-
-        # ext_embeddings, ext_attention_mask = self.get_last_hidden_states(
+        
+        # for baseline langbridge
+        # base_embeddings, base_attention_mask = self.get_last_hidden_states(
         #     encoded_inputs, 
-        #     self.embedding_model_ext, 
-        #     self.tokenizer_ext,
+        #     self.embedding_model_base,
+        #     self.tokenizer_base,
         # )
-
-        # fused_embeddings, fused_attention_mask = self.fusion_block(ext_embeddings, ext_attention_mask, base_embeddings, base_attention_mask)
-
-        # fused_embeddings = torch.cat([fused_embeddings, base_embeddings], dim=1)
-        # fused_attention_mask = torch.cat([fused_attention_mask, base_attention_mask], dim=1)
 
         return base_embeddings, base_attention_mask
     

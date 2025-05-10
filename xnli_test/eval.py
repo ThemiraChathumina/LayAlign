@@ -27,12 +27,12 @@ def construct_prompt(sample):
     return f"### Instruction:\nNews Sentence: {sample}\nClassify the given news sentence into one of the following categories.\nBusiness, Entertainment, Political, Sports, Science.\n\n### Response:"
 
 def main():
-    llm_path = "LLaMAX/LLaMAX2-7B-XNLI"
-    mt_path = "google/mt5-xl"
+    llm_path = "meta-llama/Llama-3.2-1B-Instruct"
+    mt_path = "google/mt5-large"
     ext_path = "facebook/nllb-200-distilled-600M"
     max_seq_len = 512
     max_gen_len = 512
-    eval_batch_size = 4
+    eval_batch_size = 16
     augmentation = False
     save_name = "no_aug"
     task = "xnli"
@@ -78,8 +78,8 @@ def main():
         'result_path_base': result_path_base
     }, indent=2))
     print("cuda available: " , torch.cuda.is_available())
-    train_micro_batch_size_per_gpu = 4
-    train_batch_size = 4
+    train_micro_batch_size_per_gpu = 16
+    train_batch_size = 16
     gpu_num = torch.cuda.device_count()
     gradient_accumulation = 1
     # assert train_micro_batch_size_per_gpu * gpu_num * gradient_accumulation == train_batch_size
@@ -98,7 +98,7 @@ def main():
         'augmentation' :  augmentation,
         'max_seq_len': max_seq_len
     }
-    init_checkpoint = "/root/LayAlign/prefix_xnli/pytorch_model.bin"
+    init_checkpoint = "./outputs/xnli/epoch_2_no_aug/pytorch_model.bin"
     model = MPTModel(model_config)
     if init_checkpoint is not None:
         init_checkpoint = init_checkpoint

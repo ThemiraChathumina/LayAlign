@@ -15,12 +15,12 @@ from read_data import ExperimentDataset, llm_input_features
 
 class Arguments:
     def __init__(self):
-        BATCH_SIZE_PER_GPU=4
+        BATCH_SIZE_PER_GPU=8
         TOTAL_BATCH_SIZE=8
         GRADIENT_ACC_STEPS = TOTAL_BATCH_SIZE // BATCH_SIZE_PER_GPU
 
-        self.llm_path = "LLaMAX/LLaMAX2-7B-XNLI"
-        self.mt_path = "google/mt5-xl"
+        self.llm_path = "meta-llama/Llama-3.2-1B-Instruct"
+        self.mt_path = "google/mt5-large"
         self.ext_path = "facebook/nllb-200-distilled-600M"
         self.train_num = 8888
         self.dev_size = 1000
@@ -36,7 +36,7 @@ class Arguments:
         self.save_name = 'xnli'
         self.stage_name = 'no_aug'
         self.report_to = 'wandb'
-        self.logging_steps = 10
+        self.logging_steps = 100
         self.warm_rate = 0.05
         self.lr_scheduler_name = 'cosine'
         self.system_prompt = None
