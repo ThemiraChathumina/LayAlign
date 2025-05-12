@@ -5,7 +5,7 @@ from torch import nn
 import torch.nn.functional as F
 import csv 
 import numpy as np
-from Configs import XNLIConfigs
+from Configs import IDPConfigs
 
 class JSMMultilingualEmbeddingModel(nn.Module):
     ALLOWED_MODELS = {
@@ -56,7 +56,7 @@ class JSMMultilingualEmbeddingModel(nn.Module):
             self.temp = nn.Parameter(torch.tensor(1e2))
         
        
-        self.configs = XNLIConfigs()
+        self.configs = IDPConfigs()
 
         self.langbridge_baseline = self.configs.baseline
         self.csv_file = open(self.configs.gate_csv_path, "a", newline="")

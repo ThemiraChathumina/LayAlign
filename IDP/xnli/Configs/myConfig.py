@@ -1,4 +1,6 @@
-class XNLIConfigs:
+from IDPDatasets import *
+
+class IDPConfigs:
     def __init__(self):
         self.system_prompt = None
         self.baseline = True
@@ -11,6 +13,8 @@ class XNLIConfigs:
         self.lang = 'en'
         self.num_epochs = 3
         self.checkpoint = f'./outputs/{self.save_name}/epoch_{self.num_epochs-1}_{self.args}/pytorch_model.bin'
+        self.dataset : AbstractDataset = AmazonReviewDataset()
+        self.train_limit = 100000
 
     def getPremise(self):
         if self.lang == 'en':

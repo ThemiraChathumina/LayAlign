@@ -12,7 +12,7 @@ import math
 from model import MPTModel
 from utils import set_seed, save_with_accelerate
 from read_data import ExperimentDataset, llm_input_features
-from Configs import XNLIConfigs
+from Configs import IDPConfigs
 
 class Arguments:
     def __init__(self):
@@ -20,7 +20,7 @@ class Arguments:
         TOTAL_BATCH_SIZE=8
         GRADIENT_ACC_STEPS = TOTAL_BATCH_SIZE // BATCH_SIZE_PER_GPU
 
-        self.configs = XNLIConfigs()
+        self.configs = IDPConfigs()
 
         self.llm_path = "meta-llama/Llama-3.2-1B-Instruct"
         self.mt_path = "google/mt5-large"
@@ -82,26 +82,13 @@ def main():
     token = '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'
     login(token=token)
 
-    train_samples = []
+   
 
-    ds = load_dataset("facebook/xnli", configs.lang)
+    dataset = configs.dataset
+    train_lang = configs.lang
+    train_limit = configs.train_limit
 
-    train_ds = ds['train']
-
-    for i in range(100000):
-        example = train_ds[i]
-        premise = example['premise']
-        hypothesis = example['hypothesis']
-        labels = {0:'Entailment', 1:'Neutral', 2:'Contradiction'}
-        sentence = f"{configs.getPremise()}: {premise.strip()} {configs.getHypothesis()}: {hypothesis.strip()} {configs.getLabel()}: "
-        label = f"{labels[int(example['label'])]}"
-    
-        sample = {
-            'prompt': sentence,
-            'target': label
-        }
-
-        train_samples.append(sample)
+    train_samples = dataset.get_train_set(train_lang, limit=train_limit)
 
     args.train_num = len(train_samples)
     
@@ -200,8 +187,8 @@ def main():
 
     # Log a few random samples from the training set:
     for index in random.sample(range(len(train_set)), 3):
-        print(f"Sample {index} of the training set: {apply_chat_template_func(train_set[index])}.")
-    
+        print(f"Sample {index} of the training set: {train_set[index]}.")
+
     # Optimizer
     optimizer = torch.optim.AdamW(parameters, betas=[0.8,0.999], eps=1e-8, weight_decay=3e-7, lr=args.lr)
 

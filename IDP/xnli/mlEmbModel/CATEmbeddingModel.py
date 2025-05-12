@@ -3,7 +3,7 @@ import torch
 from transformers import AutoTokenizer
 from torch import nn
 import torch.nn.functional as F
-from Configs import XNLIConfigs
+from Configs import IDPConfigs
 
 class CrossLayerAttention(nn.Module):
     def __init__(self, d_model):
@@ -69,7 +69,7 @@ class CATMultilingualEmbeddingModel(nn.Module):
         
         
        
-        self.configs = XNLIConfigs()
+        self.configs = IDPConfigs()
 
         self.langbridge_baseline = self.configs.baseline
         

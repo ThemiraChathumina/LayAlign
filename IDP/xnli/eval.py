@@ -23,7 +23,7 @@ from utils import get_train_ds_config, set_seed, evaluate_classification
 from model import MPTModel
 from read_data import ExperimentDataset, llm_input_features
 
-from Configs import XNLIConfigs
+from Configs import IDPConfigs
 
 def construct_prompt(sample):
     return f"### Instruction:\nNews Sentence: {sample}\nClassify the given news sentence into one of the following categories.\nBusiness, Entertainment, Political, Sports, Science.\n\n### Response:"
@@ -42,7 +42,7 @@ def apply_chat_template(system_prompt, user_prompt, tokenizer_llm, tokenize=Fals
     return chat_prompt
 
 def main():
-    confings = XNLIConfigs()
+    confings = IDPConfigs()
 
     llm_path = "meta-llama/Llama-3.2-1B-Instruct"
     mt_path = "google/mt5-large"
@@ -61,25 +61,10 @@ def main():
     token = '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'
     login(token=token)
 
-    languages = ['en', 'ar', 'bg', 'de', 'el', 'es', 'fr', 'hi', 'ru', 'sw', 'th', 'tr', 'ur', 'vi', 'zh']
-    test_sets = {}
-    for lang in languages:
-        ds = load_dataset("facebook/xnli", lang)
-        test_ds = ds['test']
-        test_set = []
-        for i in range(len(test_ds)):
-            example = test_ds[i]
-            premise = example['premise']
-            hypothesis = example['hypothesis']
-            labels = {0:'Entailment', 1:'Neutral', 2:'Contradiction'}
-            sentence = f"{confings.getPremise()}: {premise.strip()} {confings.getHypothesis()}: {hypothesis.strip()} {confings.getLabel()}:"
-            label = f"{labels[int(example['label'])]}"
-            sample = {
-                'prompt': sentence,
-                'target': label
-            }
-            test_set.append(sample)
-        test_sets[lang] = test_set
+    dataset = confings.dataset
+    
+    test_sets = dataset.get_test_sets()
+    
 
     os.makedirs(result_path_base, exist_ok=True)
     tokenizer_llm = AutoTokenizer.from_pretrained(llm_path, use_fast=True)
