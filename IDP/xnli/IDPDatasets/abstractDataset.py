@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from datasets import load_dataset
 
+from collections import defaultdict
+
 class AbstractDataset(ABC):
     def __init__(self):
         self.labels = self.get_label_mapping()
@@ -41,9 +43,12 @@ class AbstractDataset(ABC):
 
     def get_processed_set(self, dataset, limit=None):
         if limit is not None:
-            dataset = dataset.select(range(min(limit, len(dataset))))
+            # Assume you want limit examples TOTAL, divided evenly across classes
+            num_classes = len(set(dataset.unique('label')))
+            limit_per_class = max(limit // num_classes, 1)
+            dataset = self.stratified_select(dataset, limit_per_class=limit_per_class)
         return [
-            {"prompt": sentence, "label": label}
+            {"prompt": sentence, "target": label}
             for example in dataset
             for sentence, label in [self.process_prompt(example)]
         ]
@@ -56,3 +61,14 @@ class AbstractDataset(ABC):
 
     def get_test_sets(self, limit=None):
         return {lang: self.get_test_set(lang, limit=limit) for lang in self.test_languages}
+
+    def stratified_select(self,dataset, label_column='label', limit_per_class=100):
+        label_to_indices = defaultdict(list)
+        for i, item in enumerate(dataset):
+            label_to_indices[item[label_column]].append(i)
+
+        selected_indices = []
+        for label, indices in label_to_indices.items():
+            selected_indices.extend(indices[:limit_per_class])
+
+        return dataset.select(selected_indices).shuffle(seed=42)
