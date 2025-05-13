@@ -3,7 +3,8 @@ import torch
 from transformers import AutoTokenizer
 from torch import nn
 import torch.nn.functional as F
-from mlEmbModel import JSMEmbeddingModel
+from mlEmbModel import JSMMultilingualEmbeddingModel, TransSMMultilingualEmbeddingModel
+from Configs import IDPConfigs
 
 class MLP(nn.Module):
     def __init__(self, mt_dim, llm_dim):
@@ -109,8 +110,15 @@ class MPTModel(nn.Module):
     def __init__(self, config):
         super(MPTModel, self).__init__()
         self.config = config  # Ensure there is a config attribute
+        self.idp_configs = IDPConfigs()
         self.max_gen_len = config['max_gen_len']
-        self.encoder_mt = JSMEmbeddingModel(config['mt_path'], config['ext_path'], config['max_seq_len'])
+
+        if config['encoder'] == 'JSME':
+            self.encoder_mt = JSMMultilingualEmbeddingModel(config['mt_path'], config['ext_path'], config['max_seq_len'])
+        elif config['encoder'] == 'TransSM':
+            self.encoder_mt = TransSMMultilingualEmbeddingModel(config['mt_path'], config['ext_path'], config['max_seq_len'])
+        else:
+            raise ValueError("Invalid encoder type. Choose 'JSME' or 'TransSM'.")
 
         model_llm = AutoModelForCausalLM.from_pretrained(config['llm_path'])
 

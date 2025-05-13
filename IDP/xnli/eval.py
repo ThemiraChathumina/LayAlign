@@ -49,7 +49,7 @@ def main():
     ext_path = "facebook/nllb-200-distilled-600M"
     max_seq_len = 512
     max_gen_len = 512
-    eval_batch_size = 4
+    eval_batch_size = 16
     augmentation = False
     save_name = "no_aug"
     task = "xnli"

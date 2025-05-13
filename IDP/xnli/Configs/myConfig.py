@@ -5,7 +5,10 @@ class IDPConfigs:
         self.system_prompt = None
         self.baseline = True
         self.dataset = "xnli"
-        self.improvement_under_test = "softmax"
+        self.encoder = "JSME" # allowed Values ["JSME", "TransSM"]
+        
+        
+        self.improvement_under_test = "softmax" if self.encoder == "JSME" else "softmax_transformer"
         self.args = "SystemPromptAdded" if self.system_prompt else "NoArgs"
         self.run_name  = "baseline" if self.baseline else  self.improvement_under_test
         self.save_name = f"{self.dataset}_{self.run_name}"
@@ -13,8 +16,9 @@ class IDPConfigs:
         self.lang = 'en'
         self.num_epochs = 3
         self.checkpoint = f'./outputs/{self.save_name}/epoch_{self.num_epochs-1}_{self.args}/pytorch_model.bin'
-        self.dataset : AbstractDataset = AmazonReviewDataset()
+        self.dataset : AbstractDataset = XNLIDataset()
         self.train_limit = 100000
+        
 
     def getPremise(self):
         if self.lang == 'en':
