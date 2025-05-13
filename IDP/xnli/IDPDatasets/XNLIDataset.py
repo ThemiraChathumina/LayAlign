@@ -7,11 +7,11 @@ class XNLIDataset(AbstractDataset):
 
     @property
     def training_languages(self):
-        return ["en", "es", "fr", "de", "zh", "ar"]
+        return ["en", "ar", "bg", "de", "el", "es", "fr", "hi", "ru", "sw", "th", "tr", "ur", "vi", "zh"]
 
     @property
     def test_languages(self):
-        return ["en", "es", "fr", "de", "zh", "ar"]
+        return ["en", "ar", "bg", "de", "el", "es", "fr", "hi", "ru", "sw", "th", "tr", "ur", "vi", "zh"]
 
     def get_label_mapping(self):
         return {
