@@ -113,9 +113,9 @@ class MPTModel(nn.Module):
         self.idp_configs = IDPConfigs()
         self.max_gen_len = config['max_gen_len']
 
-        if config['encoder'] == 'JSME':
+        if self.idp_configs.encoder == 'JSME':
             self.encoder_mt = JSMMultilingualEmbeddingModel(config['mt_path'], config['ext_path'], config['max_seq_len'])
-        elif config['encoder'] == 'TransSM':
+        elif self.idp_configs.encoder == 'TransSM':
             self.encoder_mt = TransSMMultilingualEmbeddingModel(config['mt_path'], config['ext_path'], config['max_seq_len'])
         else:
             raise ValueError("Invalid encoder type. Choose 'JSME' or 'TransSM'.")

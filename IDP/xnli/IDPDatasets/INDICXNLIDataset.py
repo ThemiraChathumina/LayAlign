@@ -3,7 +3,7 @@ from XNLIDataset import XNLIDataset
 class INDICXNLIDataset(XNLIDataset):
     @property
     def hf_path(self):
-        return "facebook/xnli"
+        return "Divyanshu/indicxnli"
 
     @property
     def training_languages(self):
